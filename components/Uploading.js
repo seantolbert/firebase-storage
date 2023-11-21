@@ -1,4 +1,11 @@
-import { View, Text, StyleSheet, Button, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Button,
+  TouchableOpacity,
+  Image,
+} from "react-native";
 import { BlurView, VibrancyView } from "@react-native-community/blur";
 import ProgressBar from "./ProgressBar";
 import { Video } from "expo-av";
@@ -55,6 +62,7 @@ const Uploading = ({ image, video, progress }) => {
           />
         )}
         <Text style={{ fontSize: 12 }}>Uploading...</Text>
+        <ProgressBar progress={progress} />
         <View
           style={{
             height: 1,
