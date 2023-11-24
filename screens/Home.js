@@ -1,16 +1,31 @@
-import { View, Text, TouchableOpacity, Image } from "react-native";
+import { View, Image, TouchableOpacity, FlatList } from "react-native";
 import Uploading from "../components/Uploading";
 import IonIcons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { addDoc, collection, onSnapshot } from "firebase/firestore";
 import { db, storage } from "../firebase";
+import { Video } from "expo-av";
 
 const Home = () => {
   const [image, setImage] = useState("");
   const [video, setVideo] = useState("");
   const [progress, setProgress] = useState(0);
+  const [files, setFiles] = useState([]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "files"), (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          console.log("new file", change.doc.data());
+          setFiles((prevFiles) => [...prevFiles, change.doc.data()]);
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   async function pickImage() {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -39,10 +54,11 @@ const Home = () => {
       setImage(result.assets[0].uri);
       // upload the video
       await uploadImage(result.assets[0].uri, "video");
+      await saveRecord("image", url);
     }
   }
 
-  async function uploadImage(uri, filetype) {
+  async function uploadImage(uri, fileType) {
     const response = await fetch(uri);
     const blob = await response.blob();
 
@@ -66,6 +82,7 @@ const Home = () => {
         getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
           console.log("File available at ", downloadURL);
           // save record
+          await saveRecord(fileType, downloadURL, new Date().toISOString());
           setImage("");
           setVideo("");
         });
@@ -78,8 +95,10 @@ const Home = () => {
       const docRef = await addDoc(collection(db, "files"), {
         fileType,
         url,
-        createdAt
+        createdAt,
       });
+
+      console.log("document saved correctly " + docRef.id);
     } catch (err) {
       console.log(err);
     }
@@ -87,6 +106,37 @@ const Home = () => {
 
   return (
     <View style={{ flex: 1 }}>
+      <FlatList
+        data={files}
+        keyExtractor={(item) => item.url}
+        numColumns={3}
+        contentContainerStyle={{ gap: 2 }}
+        columnWrapperStyle={{ gap: 2 }}
+        renderItem={({ item }) => {
+          if (item.fileType === "image") {
+            return (
+              <Image
+                source={{ uri: item.url }}
+                style={{ width: "34%", height: 100 }}
+              />
+            );
+          } else {
+            return (
+              <Video
+                source={{ uri: item.url }}
+                rate={1.0}
+                volume={1.0}
+                isMuted={false}
+                resizeMode="cover"
+                shouldPlay
+                // isLooping
+                style={{ width: "34%", height: 100 }}
+                useNativeControls
+              />
+            );
+          }
+        }}
+      />
       {image && <Uploading image={image} video={video} progress={progress} />}
 
       <TouchableOpacity
